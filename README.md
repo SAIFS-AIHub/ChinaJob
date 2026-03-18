@@ -178,7 +178,7 @@
 ```
 网约车司机    Gap=7  (near=2, ceiling=9)  - 技术成熟但政策限制
 软件工程师    Gap=4  (near=5, ceiling=9)  - Copilot 普及但信任度低
-科研人员      Gap=4  (near=3, ceiling=7)  - AI 工具覆盖率接近0%
+科研人员      Gap=4  (near=3, ceiling=7)  - AI 工具覆盖GAP巨大
 ```
 
 ### 2. 就业影响路径分布
