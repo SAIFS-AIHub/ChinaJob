@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>中国职业 AI 暴露度图谱</title>
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #0a0a0f;
+  --bg2: #12121a;
+  --fg: #e0e0e8;
+  --fg2: #888894;
+  --sidebar-w: 280px;
+}
+
+:root {
+  --legend-h: 30px;
+  --footer-h: 38px;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Segoe UI', system-ui, sans-serif;
+  overflow: hidden;
+  height: 100vh;
+}
+
+#sidebar {
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  width: var(--sidebar-w);
+  background: var(--bg2);
+  border-right: 1px solid rgba(255,255,255,0.06);
+  padding: 20px 16px;
+  z-index: 10;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+#sidebar::-webkit-scrollbar { width: 3px; }
+#sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+#sidebar h1 {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.35;
+}
+#sidebar .subtitle {
+  font-size: 10.5px;
+  color: var(--fg2);
+  margin-top: 4px;
+  line-height: 1.5;
+}
+#sidebar .subtitle a { color: var(--fg2); text-decoration: none; }
+#sidebar .subtitle a:hover { color: var(--fg); }
+
+.stat-section {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.stat-section h3 {
+  font-size: 9.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg2);
+}
+.stat-big {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+.stat-label {
+  font-size: 10.5px;
+  color: var(--fg2);
+}
+
+.tier-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.tier-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+}
+.tier-color {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.tier-name {
+  flex: 1;
+  color: var(--fg2);
+}
+.tier-jobs {
+  text-align: right;
+  white-space: nowrap;
+}
+.tier-pct {
+  text-align: right;
+  width: 30px;
+  color: var(--fg2);
+  font-size: 10px;
+}
+
+.histogram {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 44px;
+}
+.histogram .bar {
+  flex: 1;
+  border-radius: 1px 1px 0 0;
+  min-height: 1px;
+}
+.hist-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  color: var(--fg2);
+  margin-top: 2px;
+}
+
+.impact-dots {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.impact-dot-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--fg2);
+}
+.impact-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.hbar-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.hbar-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+}
+.hbar-label {
+  width: 62px;
+  flex-shrink: 0;
+  color: var(--fg2);
+  font-size: 10px;
+  text-align: right;
+}
+.hbar-track {
+  flex: 1;
+  height: 9px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.hbar-fill {
+  height: 100%;
+  border-radius: 2px;
+}
+.hbar-val {
+  width: 22px;
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--fg);
+  text-align: right;
+}
+
+.gradient-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--fg2);
+}
+.gradient-legend canvas { border-radius: 2px; }
+
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--fg2);
+}
+.legend-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+canvas#canvas {
+  display: block;
+  position: fixed;
+  top: var(--legend-h);
+  left: var(--sidebar-w);
+  bottom: var(--footer-h);
+  right: 0;
+  cursor: default;
+}
+
+/* ── Tooltip ─────────────────────────── */
+
+#tooltip {
+  position: fixed;
+  pointer-events: none;
+  background: #141420;
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 8px;
+  padding: 14px 16px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  max-width: 400px;
+  opacity: 0;
+  transition: opacity 0.1s;
+  z-index: 20;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.65);
+}
+#tooltip.visible { opacity: 1; }
+
+#tooltip .tt-title {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 2px;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+#tooltip .tt-badge {
+  font-size: 9px;
+  padding: 1.5px 5px;
+  border-radius: 3px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+}
+#tooltip .tt-name-en {
+  font-size: 11px;
+  color: var(--fg2);
+  margin-bottom: 8px;
+}
+
+#tooltip .tt-dual-score {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 5px;
+}
+#tooltip .tt-dual-score > div { flex: 1; }
+#tooltip .tt-score-label {
+  font-size: 9px;
+  color: var(--fg2);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 2px;
+}
+#tooltip .tt-score-value {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+}
+#tooltip .tt-score-desc {
+  font-size: 9.5px;
+  color: var(--fg2);
+  margin-top: 2px;
+}
+#tooltip .tt-gap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  padding: 0 4px;
+}
+#tooltip .tt-gap-value {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg2);
+  background: rgba(255,255,255,0.05);
+  padding: 4px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+#tooltip .tt-stats {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  font-size: 11.5px;
+  margin-bottom: 8px;
+}
+#tooltip .tt-stats .label { color: var(--fg2); }
+#tooltip .tt-stats .value { color: var(--fg); text-align: right; }
+
+#tooltip .tt-rationale {
+  font-size: 11px;
+  color: var(--fg2);
+  line-height: 1.45;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  padding-top: 8px;
+  margin-bottom: 0;
+}
+
+#tooltip .tt-source {
+  font-size: 10px;
+  margin-top: 8px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  line-height: 1.4;
+  border-left: 2px solid;
+}
+#tooltip .tt-china-note {
+  font-size: 10.5px;
+  color: #fbbf24;
+  margin-top: 6px;
+  padding: 5px 8px;
+  background: rgba(251, 191, 36, 0.06);
+  border-left: 2px solid rgba(251, 191, 36, 0.4);
+  border-radius: 0 3px 3px 0;
+  line-height: 1.4;
+}
+
+/* ── 移动端适配 ──────────────────────────── */
+@media (max-width: 640px) {
+  #sidebar {
+    top: 0; left: 0; right: 0; bottom: auto;
+    width: 100%;
+    height: 48px;
+    overflow: hidden;
+    transition: height 0.25s ease;
+    z-index: 200;
+    border-right: none;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  #sidebar.open { height: 70vh; overflow-y: auto; }
+  #sidebar-toggle {
+    display: flex !important;
+  }
+  canvas#canvas {
+    top: 48px !important;
+    left: 0 !important;
+    bottom: 0 !important;
+    right: 0 !important;
+  }
+  #legend-bar { display: none !important; }
+  footer { display: none !important; }
+  #tooltip {
+    max-width: calc(100vw - 20px);
+    font-size: 11px;
+    padding: 10px 12px;
+  }
+}
+
+/* ── 新增：页面说明样式 ────────────────────────── */
+.site-intro {
+  margin: 20px auto;
+  max-width: 900px;
+  padding: 0 24px;
+  color: var(--fg);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.site-intro p {
+  margin-bottom: 12px;
+}
+.site-intro strong {
+  color: var(--fg);
+  font-weight: 600;
+}
+.site-intro details {
+  margin-top: 10px;
+  font-size: 12px;
+}
+.site-intro summary {
+  cursor: pointer;
+  color: var(--fg2);
+  user-select: none;
+}
+.site-intro summary:hover {
+  color: var(--fg);
+}
+
+/* ── 新增：图例样式 ────────────────────────── */
+.legend-guide {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 10.5px;
+  color: var(--fg2);
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.legend-rect {
+  flex-shrink: 0;
+}
+
+/* ── 新增：Caveat样式 ────────────────────────── */
+.caveat-box {
+  border-top: 1px solid rgba(255,255,255,0.15);
+  margin-top: 12px;
+  padding-top: 10px;
+  font-size: 11px;
+  opacity: 0.75;
+  line-height: 1.6;
+}
+.caveat-box strong {
+  color: var(--fg);
+}
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+  <button id="sidebar-toggle"
+    onclick="document.getElementById('sidebar').classList.toggle('open')"
+    style="display:none;position:absolute;top:10px;right:12px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:var(--fg);font-size:12px;padding:4px 10px;border-radius:4px;cursor:pointer;z-index:10">
+    ☰ 数据
+  </button>
+  <div>
+    <h1>中国职业 AI 暴露度图谱</h1>
+    <div class="subtitle" style="font-size:10px;line-height:1.5;margin-top:6px">
+      本工具可视化 <strong><span id="occCount">42</span> 个职业</strong>的AI暴露度，覆盖约 <strong>4.2亿</strong>就业人口。
+      矩形面积 = 就业体量 ；底色 = 当前AI渗透 ；圆点 = 技术上限。
+      点击查看详情。
+      <details style="margin-top:4px">
+        <summary style="cursor:pointer;opacity:0.7">评分方法</summary>
+        <p style="font-size:9.5px;opacity:0.65;margin-top:4px;line-height:1.4">
+          使用 LLM 评估每个职业的AI暴露度：<br>
+          <strong>实际暴露度</strong>（当前实际冲击，2027前）基于中国实际渗透率；<br>
+          <strong>理论暴露度</strong>（长期技术上限，5-10年）基于理论可行性。<br>
+          评分考虑监管约束。
+        </p>
+      </details>
+    </div>
+  </div>
+
+  <div class="stat-section">
+    <h3>覆盖就业</h3>
+    <div class="stat-big" id="statTotalJobs">—</div>
+  </div>
+
+  <div class="stat-section">
+    <h3>就业加权暴露度</h3>
+    <div class="stat-big" id="statAvgExposure">—</div>
+    <div class="stat-label">0–10</div>
+  </div>
+
+  <div class="stat-section">
+    <h3>高暴露工资敞口</h3>
+    <div class="stat-big" id="statHighExpWage">—</div>
+    <div class="stat-label">score ≥ 5</div>
+  </div>
+
+  <div class="stat-section">
+    <h3>实际暴露工资量</h3>
+    <div class="stat-big" id="statActualExpWage">—</div>
+    <div class="stat-label">当前渗透率加权</div>
+  </div>
+
+  <div class="stat-section">
+    <h3>理论暴露工资量</h3>
+    <div class="stat-big" id="statTheoExpWage">—</div>
+    <div class="stat-label">技术上限加权</div>
+  </div>
+
+  <div class="stat-section">
+    <h3>就业分布</h3>
+    <div class="histogram" id="histogram"></div>
+    <div class="hist-labels"><span>0</span><span>5</span><span>10</span></div>
+  </div>
+
+  <div class="stat-section">
+    <h3>分级</h3>
+    <div class="tier-bar" id="tierBar"></div>
+  </div>
+
+  <div class="stat-section">
+    <h3>影响模式</h3>
+    <div class="impact-dots" id="impactModeDots"></div>
+  </div>
+
+  <div class="stat-section">
+    <h3>暴露度 × 收入</h3>
+    <div class="hbar-chart" id="payChart"></div>
+  </div>
+
+  <div class="stat-section">
+    <h3>暴露度 × 学历</h3>
+    <div class="hbar-chart" id="eduChart"></div>
+  </div>
+
+  <div class="stat-section" style="gap:8px">
+    <div class="sidebar-footer" style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.07);line-height:1.8">
+      分类 · 职业分类大典 2022<br>
+      数据 · 国家统计局 / 行业协会<br>
+      
+      <!-- 👇 新增的链接区块 -->
+      <div style="margin-top:6px; padding-top:6px; border-top:1px dotted rgba(255,255,255,0.15);">
+        开源 · 
+        <a href="https://github.com/SAIFS-AIHub/ChinaJob" target="_blank" style="color:var(--fg); text-decoration:none; font-weight:500; border-bottom:1px solid rgba(255,255,255,0.3); padding-bottom:1px;">
+          GitHub @offshore4190
+        </a>
+        <br>
+        灵感 · 
+        <a href="https://karpathy.ai/jobs/" target="_blank" style="color:#a0c4ff; text-decoration:none;">
+          Andrej Karpathy
+        </a> 
+        & 
+        <a href="https://www.anthropic.com/research/labor-market-impacts" target="_blank" style="color:#a0c4ff; text-decoration:none;">
+          Anthropic 报告
+        </a>
+      </div>
+      <!-- 👆 新增的链接区块结束 -->
+
+    </div>
+  </div>
+
+  <div style="margin-top:auto;padding-top:12px;display:flex;flex-direction:column;gap:8px">
+    <button onclick="
+      const url = 'https://github.com/SAIFS-AIHub/ChinaJob';
+      navigator.clipboard.writeText(url).then(() => {
+        this.textContent = '✓ 已复制链接';
+        setTimeout(() => this.textContent = '🔗 分享此页', 1500);
+      });
+    " style="width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:var(--fg);font-size:11px;padding:6px 0;border-radius:4px;cursor:pointer;letter-spacing:0.03em">
+      🔗 分享此页
+    </button>
+    <div style="border-top:1px solid rgba(255,255,255,0.07);padding-top:8px;font-size:9.5px;color:rgba(255,255,255,0.25);line-height:1.8">
+      © 2026 <span style="color:rgba(255,255,255,0.45);font-weight:500">SAIFS</span><br>
+      Citation: 郝牧青，胡忠博，吴宗翰，邵怡蕾. 中国职业AI暴露度图谱. SAIFS, 2026.<br>
+      <a href="https://github.com/SAIFS-AIHub/ChinaJob" target="_blank" style="color:rgba(160,196,255,0.6);text-decoration:none">github.com/SAIFS-AIHub</a>
+    </div>
+  </div>
+</div> <!-- sidebar 结束的 div -->
+
+<div style="position:fixed;top:0;left:var(--sidebar-w);right:0;display:flex;align-items:center;gap:16px;padding:6px 12px;font-size:11px;opacity:0.75;flex-wrap:wrap;border-bottom:1px solid rgba(255,255,255,0.1);background:var(--bg);z-index:100">
+  <span>▪ 面积 = 就业体量</span>
+  <span>▪ 底色深度 = 当前AI暴露度</span>
+  <span>● 右上角圆点 = 技术可行上限</span>
+  <span style="border:1px dashed rgba(255,255,255,0.5);padding:0 4px">虚线</span>
+  <span>= 新职业（大典2022）</span>
+  <span>~ = 就业数据置信度低</span>
+  <span style="display:flex;align-items:center;gap:4px;margin-left:auto">
+    低
+    <span style="width:80px;height:8px;border-radius:2px;background:linear-gradient(90deg,#4caf4c,#e03333);display:inline-block"></span>
+    高
+  </span>
+</div>
+
+<div style="height:32px"></div>
+
+<canvas id="canvas"></canvas>
+
+<div id="tooltip">
+  <div class="tt-title"></div>
+  <div class="tt-name-en"></div>
+  <div class="tt-dual-score"></div>
+  <div class="tt-stats"></div>
+  <div class="tt-rationale"></div>
+  <div class="tt-source"></div>
+  <div class="tt-china-note"></div>
+</div>
+
+<script>
+
+// ── Color scale ──────────────────────────────────────────────────────
+
+function exposureColor(score) {
+  if (score == null) return [100, 100, 110];
+  const t = Math.max(0, Math.min(10, score)) / 10;
+  let r, g, b;
+  if (t < 0.5) {
+    const s = t / 0.5;
+    r = Math.round(55 + s * 170);
+    g = Math.round(165 - s * 10);
+    b = Math.round(55 - s * 20);
+  } else {
+    const s = (t - 0.5) / 0.5;
+    r = Math.round(225 + s * 30);
+    g = Math.round(155 - s * 115);
+    b = Math.round(35 - s * 15);
+  }
+  return [r, g, b];
+}
+
+function eCSS(score, alpha) {
+  const [r, g, b] = exposureColor(score);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+// ── Confidence colors ────────────────────────────────────────────────
+
+const CONF = {
+  H: { bg: 'rgba(52,211,153,0.08)', border: 'rgba(52,211,153,0.4)', text: '#34d399', label: '高' },
+  M: { bg: 'rgba(251,191,36,0.08)', border: 'rgba(251,191,36,0.35)', text: '#fbbf24', label: '中' },
+  L: { bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.35)', text: '#ef4444', label: '低' },
+};
+
+// ── Squarified treemap ───────────────────────────────────────────────
+
+function squarify(items, x, y, w, h) {
+  if (!items.length) return [];
+  if (items.length === 1) return [{ ...items[0], rx: x, ry: y, rw: w, rh: h }];
+  const total = items.reduce((s, d) => s + d.value, 0);
+  if (total === 0) return [];
+  const results = [];
+  let rem = [...items], cx = x, cy = y, cw = w, ch = h;
+  while (rem.length > 0) {
+    const remT = rem.reduce((s, d) => s + d.value, 0);
+    const vert = cw >= ch, side = vert ? ch : cw;
+    let row = [rem[0]], rowS = rem[0].value;
+    for (let i = 1; i < rem.length; i++) {
+      const cand = [...row, rem[i]], candS = rowS + rem[i].value;
+      if (worst(cand, candS, side, remT, vert ? cw : ch) <
+          worst(row, rowS, side, remT, vert ? cw : ch)) {
+        row = cand; rowS = candS;
+      } else break;
+    }
+    const frac = rowS / remT, thick = vert ? cw * frac : ch * frac;
+    let off = 0;
+    for (const item of row) {
+      const iF = item.value / rowS, iL = side * iF;
+      if (vert) results.push({ ...item, rx: cx, ry: cy + off, rw: thick, rh: iL });
+      else results.push({ ...item, rx: cx + off, ry: cy, rw: iL, rh: thick });
+      off += iL;
+    }
+    if (vert) { cx += thick; cw -= thick; } else { cy += thick; ch -= thick; }
+    rem = rem.slice(row.length);
+  }
+  return results;
+}
+
+function worst(row, rowS, side, total, ext) {
+  const re = ext * (rowS / total);
+  if (!re) return Infinity;
+  let w = 0;
+  for (const item of row) {
+    const il = side * (item.value / rowS);
+    if (!il) continue;
+    const a = Math.max(re / il, il / re);
+    if (a > w) w = a;
+  }
+  return w;
+}
+
+// ── Rendering ────────────────────────────────────────────────────────
+
+let data = [], rects = [], hovered = null;
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+let dpr = window.devicePixelRatio || 1;
+const MARGIN = 10, GAP = 1.5;
+
+function layout() {
+  const isMobile = window.innerWidth <= 640;
+  const sw = isMobile ? 0 : parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w'));
+  const legendH = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--legend-h')) || 30;
+  const footerH = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--footer-h')) || 38;
+  const topOffset = isMobile ? 48 : legendH;
+  const bottomOffset = isMobile ? 0 : footerH;
+  const w = window.innerWidth - sw;
+  const h = window.innerHeight - topOffset - bottomOffset;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  canvas.style.width = w + "px";
+  canvas.style.height = h + "px";
+
+  const byC = {};
+  for (const d of data) { const c = d.category; if (!byC[c]) byC[c] = []; byC[c].push(d); }
+
+  const cats = Object.keys(byC).map(c => ({
+    cat: c,
+    items: byC[c].sort((a, b) => (b.employment || 0) - (a.employment || 0)),
+    value: byC[c].reduce((s, d) => s + Math.pow(d.employment || 1, 0.45), 0),
+  })).sort((a, b) => b.value - a.value);
+
+  const catR = squarify(cats, MARGIN, MARGIN, w - MARGIN * 2, h - MARGIN * 2);
+  rects = [];
+  for (const cr of catR) {
+    const g = GAP;
+    const items = cr.items.map(d => ({ ...d, value: Math.pow(d.employment || 1, 0.45) }));
+    const ir = squarify(items, cr.rx + g, cr.ry + g, cr.rw - g * 2, cr.rh - g * 2);
+    for (const r of ir) rects.push(r);
+  }
+}
+
+function draw() {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = "#0a0a0f";
+  ctx.fillRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+
+  for (const r of rects) {
+    const isH = r === hovered;
+    const g = GAP / 2;
+    const rx = r.rx + g, ry = r.ry + g, rw = r.rw - g * 2, rh = r.rh - g * 2;
+    if (rw <= 0 || rh <= 0) continue;
+
+    // Fill color by score_near
+    ctx.fillStyle = eCSS(r.score_near, isH ? 0.78 : 0.48);
+    ctx.fillRect(rx, ry, rw, rh);
+
+    // New occupation: dashed border
+    if (r.is_new_occ) {
+      ctx.save();
+      ctx.strokeStyle = "rgba(255,255,255,0.45)";
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 3]);
+      ctx.strokeRect(rx + 0.5, ry + 0.5, rw - 1, rh - 1);
+      ctx.restore();
+    }
+
+    // Hover highlight
+    if (isH) {
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([]);
+      ctx.strokeRect(rx, ry, rw, rh);
+    }
+
+    // Score ceiling dot (top-right corner)
+    if (r.score_ceiling != null && rw > 20 && rh > 14) {
+      const dr = Math.min(4, Math.max(2.5, rw / 30));
+      const dx = rx + rw - dr - 4, dy = ry + dr + 4;
+      ctx.beginPath();
+      ctx.arc(dx, dy, dr, 0, Math.PI * 2);
+      ctx.fillStyle = eCSS(r.score_ceiling, isH ? 0.9 : 0.65);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.25)";
+      ctx.lineWidth = 0.8;
+      ctx.setLineDash([]);
+      ctx.stroke();
+    }
+
+    // L-confidence marker
+    if (r.est_confidence === "L" && rw > 30 && rh > 14) {
+      ctx.font = `500 ${Math.min(11, rh / 3)}px system-ui`;
+      ctx.fillStyle = "rgba(239,68,68,0.5)";
+      ctx.textBaseline = "bottom";
+      ctx.fillText("~", rx + rw - 12, ry + rh - 2);
+    }
+
+    // Text labels
+    if (rw > 44 && rh > 16) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(rx + 3, ry + 2, rw - 6, rh - 4);
+      ctx.clip();
+
+      const fs = Math.min(13, Math.max(8.5, Math.min(rw / 9, rh / 3)));
+      ctx.font = `500 ${fs}px -apple-system, 'PingFang SC', system-ui, sans-serif`;
+      ctx.fillStyle = isH ? "#fff" : "rgba(255,255,255,0.88)";
+      ctx.textBaseline = "top";
+      ctx.fillText(r.name, rx + 4, ry + 3);
+
+      if (rh > 30 && rw > 54) {
+        const empStr = r.employment >= 10000
+          ? (r.employment / 10000).toFixed(2) + "亿"
+          : r.employment >= 1000
+            ? (r.employment / 1000).toFixed(1) + "千万"
+            : r.employment + "万";
+        const info = (r.score_near != null ? r.score_near + "/10" : "") + " · " + empStr;
+        ctx.font = `400 ${Math.max(8, fs - 2)}px -apple-system, system-ui, sans-serif`;
+        ctx.fillStyle = "rgba(255,255,255,0.48)";
+        ctx.fillText(info, rx + 4, ry + 3 + fs + 2);
+      }
+      ctx.restore();
+    }
+  }
+}
+
+// ── Hit test & helpers ───────────────────────────────────────────────
+
+function hitTest(mx, my) {
+  const isMobile = window.innerWidth <= 640;
+  const sw = isMobile ? 0 : parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w'));
+  const legendH = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--legend-h')) || 30;
+  const topOffset = isMobile ? 48 : legendH;
+  const cx = mx - sw, cy = my - topOffset;
+  for (let i = rects.length - 1; i >= 0; i--) {
+    const r = rects[i];
+    if (cx >= r.rx && cx < r.rx + r.rw && cy >= r.ry && cy < r.ry + r.rh) return r;
+  }
+  return null;
+}
+
+function fmtEmp(n) {
+  if (n == null) return "—";
+  if (n >= 10000) return (n / 10000).toFixed(2) + " 亿";
+  if (n >= 1000) return (n / 1000).toFixed(1) + " 千万";
+  return n.toLocaleString() + " 万";
+}
+function fmtEmpShort(n) {
+  if (n == null) return "—";
+  if (n >= 10000) return (n / 10000).toFixed(1) + "亿";
+  if (n >= 1000) return Math.round(n / 100) / 10 + "千万";
+  return Math.round(n) + "万";
+}
+function fmtPath(p) {
+  return { headcount_reduction:'直接裁员', task_erosion:'任务侵蚀', entry_barrier:'入职收窄', demand_growth:'需求增长' }[p] || p || '—';
+}
+
+const MODE = {
+  displacement: { label: '替代', color: '#ef4444' },
+  augmentation: { label: '增强', color: '#3b82f6' },
+  mixed:        { label: '混合', color: '#f59e0b' },
+  adversarial:  { label: '对抗', color: '#8b5cf6' },
+};
+
+// ── Tooltip ──────────────────────────────────────────────────────────
+
+function showTooltip(d, mx, my) {
+  const tt = document.getElementById("tooltip");
+  const m = MODE[d.impact_mode] || { label: '—', color: '#888' };
+  const c = CONF[d.est_confidence] || CONF.M;
+
+  // Title
+  let title = `<span>${d.name}</span>`;
+  title += `<span class="tt-badge" style="background:${m.color}18;color:${m.color}">${m.label}</span>`;
+  if (d.is_new_occ) title += `<span class="tt-badge" style="background:rgba(16,185,129,0.12);color:#10b981">新职业</span>`;
+  tt.querySelector(".tt-title").innerHTML = title;
+  tt.querySelector(".tt-name-en").textContent = d.name_en || "";
+
+  // Dual score
+  const near = d.score_near != null ? d.score_near : d.score;
+  const ceil = d.score_ceiling != null ? d.score_ceiling : near;
+  tt.querySelector(".tt-dual-score").innerHTML = `
+    <div>
+      <div class="tt-score-label">当前暴露</div>
+      <div class="tt-score-value" style="color:${eCSS(near, 1)}">${near}</div>
+      <div class="tt-score-desc">2025–2027 实际</div>
+    </div>
+    <div class="tt-gap"><span class="tt-gap-value">\u25B3${ceil - near}</span></div>
+    <div>
+      <div class="tt-score-label">理论上限</div>
+      <div class="tt-score-value" style="color:${eCSS(ceil, 0.6)}">${ceil}</div>
+      <div class="tt-score-desc">5–10 年潜力</div>
+    </div>`;
+
+  // Stats
+  tt.querySelector(".tt-stats").innerHTML = `
+    <span class="label">就业</span><span class="value">${fmtEmp(d.employment)}</span>
+    <span class="label">年薪</span><span class="value">\u00a5${(d.avg_wage || 0).toLocaleString()}</span>
+    <span class="label">学历</span><span class="value">${d.education || '—'}</span>
+    <span class="label">影响路径</span><span class="value">${fmtPath(d.employment_impact_path)}</span>`;
+
+  // Rationale
+  tt.querySelector(".tt-rationale").textContent = "";
+
+  // Source with confidence color
+  const srcEl = tt.querySelector(".tt-source");
+  srcEl.style.background = c.bg;
+  srcEl.style.borderColor = c.border;
+  srcEl.style.color = c.text;
+  srcEl.innerHTML = `<span style="opacity:0.7">置信度</span> <b>${c.label}</b> · ${d.emp_data_method || '—'}`;
+
+  // China note
+  tt.querySelector(".tt-china-note").style.display = 'none';
+
+  // Position
+  const pad = 14;
+  let tx = mx + pad, ty = my - pad;
+  if (tx + 400 > window.innerWidth) tx = mx - 400 - pad;
+  if (ty < 10) ty = my + pad;
+  if (ty + 300 > window.innerHeight) ty = Math.max(10, my - 300);
+  tt.style.left = tx + "px";
+  tt.style.top = ty + "px";
+  tt.classList.add("visible");
+}
+
+function hideTooltip() { document.getElementById("tooltip").classList.remove("visible"); }
+
+// ── Sidebar stats ────────────────────────────────────────────────────
+
+function computeStats() {
+  const total = data.reduce((s, d) => s + (d.employment || 0), 0);
+  document.getElementById("occCount").textContent = data.length;
+  document.getElementById("statTotalJobs").textContent = fmtEmpShort(total);
+
+  let wS = 0, wC = 0;
+  for (const d of data) {
+    if (d.score_near != null && d.employment) { wS += d.score_near * d.employment; wC += d.employment; }
+  }
+  const wA = wC > 0 ? wS / wC : 0;
+  document.getElementById("statAvgExposure").innerHTML = `<span style="color:${eCSS(wA, 1)}">${wA.toFixed(1)}</span>`;
+
+  // 高暴露工资总量（暴露度≥5分）
+  let highExpWage = 0;
+  for (const d of data) {
+    if (d.score_near != null && d.score_near >= 5 && d.employment && d.avg_wage) {
+      highExpWage += d.employment * 10000 * d.avg_wage;
+    }
+  }
+  document.getElementById("statHighExpWage").textContent = `¥${(highExpWage / 1e12).toFixed(2)}万亿`;
+
+  // 实际暴露总工资（当前暴露度加权）
+  let actualExpWage = 0;
+  for (const d of data) {
+    if (d.score_near != null && d.employment && d.avg_wage) {
+      actualExpWage += d.employment * 10000 * d.avg_wage * (d.score_near / 10);
+    }
+  }
+  document.getElementById("statActualExpWage").textContent = `¥${(actualExpWage / 1e12).toFixed(2)}万亿`;
+
+  // 理论暴露总工资（理论上限加权）
+  let theoExpWage = 0;
+  for (const d of data) {
+    if (d.score_ceiling != null && d.employment && d.avg_wage) {
+      theoExpWage += d.employment * 10000 * d.avg_wage * (d.score_ceiling / 10);
+    }
+  }
+  document.getElementById("statTheoExpWage").textContent = `¥${(theoExpWage / 1e12).toFixed(2)}万亿`;
+
+  // Histogram
+  const hist = new Array(11).fill(0);
+  for (const d of data) { if (d.score_near != null && d.employment) hist[d.score_near] += d.employment; }
+  const maxH = Math.max(...hist);
+  document.getElementById("histogram").innerHTML = hist.map((c, i) =>
+    `<div class="bar" style="height:${Math.max(2, maxH > 0 ? c / maxH * 100 : 0)}%;background:${eCSS(i, 0.7)}" title="${i}: ${fmtEmpShort(c)}"></div>`
+  ).join("");
+
+  // Tiers
+  const tiers = [
+    { name: "极低", range: [0, 1], color: eCSS(0.5, 1) },
+    { name: "低", range: [2, 3], color: eCSS(2.5, 1) },
+    { name: "中等", range: [4, 5], color: eCSS(4.5, 1) },
+    { name: "较高", range: [6, 7], color: eCSS(6.5, 1) },
+    { name: "高", range: [8, 10], color: eCSS(9, 1) },
+  ];
+  for (const t of tiers) {
+    t.jobs = 0;
+    for (const d of data) {
+      if (d.score_near != null && d.employment && d.score_near >= t.range[0] && d.score_near <= t.range[1]) t.jobs += d.employment;
+    }
+    t.pct = total > 0 ? (t.jobs / total * 100) : 0;
+  }
+  document.getElementById("tierBar").innerHTML = tiers.map(t =>
+    `<div class="tier-row"><div class="tier-color" style="background:${t.color}"></div><span class="tier-name">${t.name} (${t.range[0]}–${t.range[1]})</span><span class="tier-jobs">${fmtEmpShort(t.jobs)}</span><span class="tier-pct">${t.pct.toFixed(0)}%</span></div>`
+  ).join("");
+
+  // Impact mode dots
+  const modes = {};
+  for (const d of data) { if (d.impact_mode && d.employment) { modes[d.impact_mode] = (modes[d.impact_mode] || 0) + d.employment; } }
+  document.getElementById("impactModeDots").innerHTML = Object.entries(MODE).map(([k, m]) => {
+    const pct = total > 0 ? ((modes[k] || 0) / total * 100).toFixed(0) : 0;
+    return `<div class="impact-dot-item"><div class="impact-dot" style="background:${m.color}"></div><span>${m.label} ${pct}%</span></div>`;
+  }).join("");
+
+  // Pay bands
+  const payBands = [
+    { label: "<5万", min: 0, max: 50000 },
+    { label: "5–10万", min: 50000, max: 100000 },
+    { label: "10–15万", min: 100000, max: 150000 },
+    { label: "15万+", min: 150000, max: Infinity },
+  ];
+  document.getElementById("payChart").innerHTML = payBands.map(b => {
+    let ws = 0, wc = 0;
+    for (const d of data) {
+      if (d.score_near != null && d.employment && d.avg_wage != null && d.avg_wage >= b.min && d.avg_wage < b.max) { ws += d.score_near * d.employment; wc += d.employment; }
+    }
+    const avg = wc > 0 ? ws / wc : 0;
+    return `<div class="hbar-row"><span class="hbar-label">${b.label}</span><div class="hbar-track"><div class="hbar-fill" style="width:${avg / 10 * 100}%;background:${eCSS(avg, 0.75)}"></div></div><span class="hbar-val">${avg.toFixed(1)}</span></div>`;
+  }).join("");
+
+  // Education (fixed matching)
+  const eduMap = [
+    { label: "初中及以下", test: e => e === "初中及以下" },
+    { label: "中职/初中+", test: e => e === "中职及以上" || e === "初中及以上" },
+    { label: "大专", test: e => e === "大专及以上" },
+    { label: "本科+", test: e => e === "本科及以上" },
+    { label: "硕士+", test: e => e === "硕士及以上" },
+  ];
+  document.getElementById("eduChart").innerHTML = eduMap.map(g => {
+    let ws = 0, wc = 0;
+    for (const d of data) { if (d.score_near != null && d.employment && g.test(d.education)) { ws += d.score_near * d.employment; wc += d.employment; } }
+    const avg = wc > 0 ? ws / wc : 0;
+    return `<div class="hbar-row"><span class="hbar-label">${g.label}</span><div class="hbar-track"><div class="hbar-fill" style="width:${avg / 10 * 100}%;background:${eCSS(avg, 0.75)}"></div></div><span class="hbar-val">${avg.toFixed(1)}</span></div>`;
+  }).join("");
+}
+
+// ── Events ───────────────────────────────────────────────────────────
+
+canvas.addEventListener("mousemove", (e) => {
+  const hit = hitTest(e.clientX, e.clientY);
+  if (hit !== hovered) { hovered = hit; draw(); }
+  if (hovered) { showTooltip(hovered, e.clientX, e.clientY); canvas.style.cursor = "pointer"; }
+  else { hideTooltip(); canvas.style.cursor = "default"; }
+});
+canvas.addEventListener("mouseleave", () => { hovered = null; hideTooltip(); draw(); });
+canvas.addEventListener("click", (e) => {
+  const hit = hitTest(e.clientX, e.clientY);
+  if (hit && hit.source_url) {
+    window.open(hit.source_url, '_blank');
+  }
+});
+
+canvas.addEventListener("touchstart", (e) => {
+  e.preventDefault();
+  const t = e.touches[0];
+  const hit = hitTest(t.clientX, t.clientY);
+  if (hit) { hovered = hit; showTooltip(hit, t.clientX, t.clientY); draw(); }
+  else { hideTooltip(); }
+}, { passive: false });
+
+function resize() { dpr = window.devicePixelRatio || 1; layout(); draw(); }
+
+function drawGradientLegend() {
+  const c = document.getElementById("gradientLegend");
+  const g = c.getContext("2d");
+  for (let x = 0; x < 80; x++) { g.fillStyle = eCSS((x / 79) * 10, 1); g.fillRect(x, 0, 1, 8); }
+}
+
+const DATA_INLINE = [{"occ_code":"6-26-01-01","name":"农业生产者","name_en":"Agricultural Worker","category":"农、林、牧、渔业生产及辅助人员","category_en":"Agricultural Workers","sub_group":"农业生产人员","nbs_industry":"农林牧渔业","nbs_industry_std":"农林牧渔业","employment":16700.0,"employment_unit":"万人","avg_wage":46433,"education":"初中及以下","is_new_occ":false,"est_confidence":"H","emp_data_method":"NBS统计年鉴2024：第一产业就业1.67亿","market_titles":["农民","种植户","养殖户"],"bls_analog":"Agricultural Workers","description_cn":"从事种植养殖；强物理劳动，机械化程度参差不齐","score_near":2,"score_ceiling":4,"score":2,"impact_mode":"augmentation","employment_impact_path":"task_erosion","policy_adjustment":null,"rationale":"农业主要依赖体力劳动，AI在精准农业有应用但渗透率极低，仅集中在大型农场示范项目。","tasks_at_risk":["病虫害监测","灌溉管理优化"],"tasks_protected":["播种收割体力劳动","牲畜饲养管理","现场环境判断"],"china_note":"中国农业AI集中在大型农场示范项目，2.6亿小农户AI渗透率极低。","score_source":"consensus_AB","scoring_model":"claude-opus-4-6","source_url":"https://www.stats.gov.cn/sj/ndsj/2024/indexch.htm"},{"occ_code":"6-02-01-01","name":"建筑工人","name_en":"Construction Worker","category":"生产制造及有关人员","category_en":"Production Workers","sub_group":"建筑施工人员","nbs_industry":"建筑业","nbs_industry_std":"建筑业","employment":4550.0,"employment_unit":"万人","avg_wage":69000,"education":"初中及以上","is_new_occ":false,"est_confidence":"M","emp_data_method":"NBS城镇549万+农民工监测报告建筑业约4000万；工资用农民工口径月均5743元×12","market_titles":["泥瓦工","钢筋工","架子工","模板工"],"bls_analog":"Construction Laborers","description_cn":"从事建筑施工体力劳动；极度依赖物理技能","score_near":1,"score_ceiling":3,"score":1,"impact_mode":"augmentation","employment_impact_path":"task_erosion","policy_adjustment":null,"rationale":"建筑施工完全依赖体力劳动和现场操作，AI几乎无法介入。建筑机器人尚在实验阶段。","tasks_at_risk":["简单测量工作"],"tasks_protected":["复杂结构搭建","现场施工决策","精细手工操作"],"china_note":"建筑业主体为农民工，AI应用集中在设计管理环节，现场施工几乎无影响。","score_source":"consensus_AB","scoring_model":"claude-opus-4-6","source_url":"https://www.stats.gov.cn/sj/zxfb/202504/t20250430_1959523.html"},{"occ_code":"4-10-05-01","name":"家政服务员","name_en":"Household Service Worker","category":"社会生产服务和生活服务人员","category_en":"Service Workers","sub_group":"家庭服务人员","nbs_industry":"居民服务/修理和其他服务业","nbs_industry_std":"居民服务修理和其他服务业","employment":3000.0,"employment_unit":"万人","avg_wage":52860,"education":"初中及以上","is_new_occ":false,"est_confidence":"M","emp_data_method":"国务院政策文件：超3000万；含全职和长期兼职","market_titles":["保姆","月嫂","育儿嫂","家庭保洁"],"bls_analog":"Maids and Housekeeping Cleaners","description_cn":"提供家庭清洁、照料服务；物理接触密集，极难被AI替代","score_near":1,"score_ceiling":3,"score":1,"impact_mode":"augmentation","employment_impact_path":"demand_growth","policy_adjustment":null,"rationale":"家政完全依赖物理接触和人际互动，AI无法介入照料和清洁核心工作。老龄化带动需求持续增长。","tasks_at_risk":["简单日程提醒"],"tasks_protected":["婴幼儿照料","老人护理","家庭清洁整理"],"china_note":"中国老龄化加速，家政服务需求旺盛，行业人员缺口大。","score_source":"consensus_AB","scoring_model":"claude-opus-4-6","source_url":"https://www.gov.cn/zhengce/content/2019-06/26/content_5403695.htm"},{"occ_code":"4-01-01-01","name":"货车司机","name_en":"Truck Driver","category":"社会生产服务和生活服务人员","category_en":"Service Workers","sub_group":"道路货物运输人员","nbs_industry":"交通运输/仓储和邮政业","nbs_industry_std":"交通运输仓储和邮政业","employment":1700.0,"employment_unit":"万人","avg_wage":78000,"education":"初中及以上","is_new_occ":false,"est_confidence":"M","emp_data_method":"交通运输部《2023年交通运输行业发展统计公报》：全国载货汽车1171万辆；中国物流与采购联合会2023：货车司机约1700万人（含个体和挂靠运输）","market_titles":["卡车司机","长途司机","货运司机","物流司机"],"bls_analog":"Heavy and Tractor-Trailer Truck Drivers","description_cn":"驾驶货车从事公路货物运输，含长途干线和城配短驳","score_near":2,"score_ceiling":8,"score":2,"impact_mode":"augmentation","employment_impact_path":"task_erosion","policy_adjustment":null,"rationale":"当前货运完全依赖人工，AI仅辅助路线规划和油耗优化。干线自动驾驶卡车（嬴彻科技等）在高速封闭场景试点，ceiling=8反映5-10年内干线货运的技术替代潜力，城配末端仍需人工。","tasks_at_risk":["高速干线驾驶","路线规划","疲劳驾驶预警"],"tasks_protected":["城市复杂路况","货物装卸","突发事故处置"],"china_note":"嬴彻科技、图森未来在高速场景试运营，但开放道路商用许可尚无全国时间表。","score_source":"claude-opus-4-6","scoring_model":"claude-opus-4-6","source_url":"https://xxgk.mot.gov.cn/jigou/zhghs/202506/t20250610_4170228.html"},{"occ_code":"2-06-01-01","name":"会计师","name_en":"Accountant","category":"专业技术人员","category_en":"Professionals","sub_group":"财务审计人员","nbs_industry":"跨行业","nbs_industry_std":"跨行业","employment":1500.0,"employment_unit":"万人","avg_wage":91556,"education":"大专及以上","is_new_occ":false,"est_confidence":"M","emp_data_method":"财政部持证人数(初级839万+中级250万+CPA36万+代记150万)+无证从业估算","market_titles":["会计","财务专员","出纳","审计"],"bls_analog":"Accountants and Auditors","description_cn":"负责财务核算、报表编制；大量标准化数字处理工作","score_near":8,"score_ceiling":9,"score":8,"impact_mode":"mixed","employment_impact_path":"task_erosion","policy_adjustment":"金税四期推动财税数字化，中国RPA渗透率高于全球均值，score_near上调","rationale":"基础账务和报表编制已被RPA大幅替代，替代程度与客服相当；税务筹划和审计判断仍需人类。金税四期使中国财税数字化程度全球领先。","tasks_at_risk":["财务数据录入","报表编制","常规税务申报"],"tasks_protected":["复杂税务筹划","审计判断","财务决策分析"],"china_note":"金税四期电子化程度高，RPA已大规模部署，中国财税数字化全球领先。","score_source":"manual_override","scoring_model":"claude-opus-4-6","source_url":"http://kzp.mof.gov.cn/"},{"occ_code":"3-01-02-01","name":"行政文员","name_en":"Administrative Clerk / Secretary","category":"办事人员和有关人员","category_en":"Clerical Workers","sub_group":"行政办公人员","nbs_industry":"跨行业","nbs_industry_std":"跨行业","employment":1200.0,"employment_unit":"万人","avg_wage":72000,"education":"大专及以上","is_new_occ":false,"est_confidence":"L","emp_data_method":"七普第7号公报：办事人员和有关人员合计6304万（2020）；扣除公务员717万、警察及安保约400万、基层执法约400万后，企事业单位行政文员/秘书口径估算约1200万，无独立权威统计","market_titles":["行政专员","文员","秘书","前台"],"bls_analog":"Secretaries and Administrative Assistants","description_cn":"从事日常行政事务、文件处理、会议安排和内部沟通协调的办公室人员","score_near":6,"score_ceiling":8,"score":6,"impact_mode":"mixed","employment_impact_path":"task_erosion","policy_adjustment":null,"rationale":"日程管理、文件整理、会议纪要等核心任务已可被AI高效完成；跨部门协调和临场应变仍需人类。AI办公助手渗透率快速提升。","tasks_at_risk":["文件整理归档","会议纪要撰写","日程排期"],"tasks_protected":["跨部门协调沟通","临场应变处理","领导意图理解"],"china_note":"钉钉/飞书AI助手已深度嵌入中国企业办公流程，行政自动化程度高。","score_source":"claude-opus-4-6","scoring_model":"claude-opus-4-6","source_url":"https://data.stats.gov.cn/easyquery.htm?cn=C01"},{"occ_code":"4-10-01-01","name":"厨师","name_en":"Chef / Cook","category":"社会生产服务和生活服务人员","category_en":"Service Workers","sub_group":"餐饮服务人员","nbs_industry":"住宿和餐饮业","nbs_industry_std":"住宿和餐饮业","employment":1199.8,"employment_unit":"万人","avg_wage":54629,"education":"中职及以上","is_new_occ":false,"est_confidence":"M","emp_data_method":"NBS行业就业×七普构成比39.2%","market_titles":["厨师","厨工","面点师","烹饪师"],"bls_analog":"Cooks","description_cn":"准备和烹饪食物；高度依赖手工技艺和感官判断","score_near":1,"score_ceiling":3,"score":1,"impact_mode":"augmentation","employment_impact_path":"task_erosion","policy_adjustment":null,"rationale":"烹饪核心为手工技艺和感官判断，AI仅能辅助食材管理等边缘环节。物理操作密集，暴露度极低。","tasks_at_risk":["食材库存管理","菜品营养分析"],"tasks_protected":["复杂菜品烹饪","感官判断调味","现场灵活应变"],"china_note":"中餐烹饪复杂度高，标准化程度低于西式快餐，AI替代难度更大。","score_source":"version_A","scoring_model":"claude-opus-4-6","source_url":"https://data.stats.gov.cn/easyquery.htm?cn=C01"},{"occ_code":"4-10-06-01","name":"外卖配送员","name_en":"Food Delivery Rider","category":"社会生产服务和生活服务人员","category_en":"Service Workers","sub_group":"配送服务人员","nbs_industry":"交通运输/仓储和邮政业","nbs_industry_std":"交通运输仓储和邮政业","employment":1000.0,"employment_unit":"万人","avg_wage":72000,"education":"初中及以上","is_new_occ":false,"est_confidence":"H","emp_data_method":"央视/科技日报2025.1：外卖骑手超1000万；美团745万+饿了么400万","market_titles":["外卖骑手","美团骑手","饿了么骑手","配送员"],"bls_analog":"Delivery Drivers","description_cn":"通过平台接单配送餐食；需要物理移动和实时路线判断，短期内无法被AI替代","score_near":2,"score_ceiling":4,"score":2,"impact_mode":"adversarial","employment_impact_path":"demand_growth","policy_adjustment":null,"rationale":"配送员依赖物理移动和实时路线判断，AI难以直接替代，但AI优化调度系统可提升效率。","tasks_at_risk":["订单分配","路线规划"],"tasks_protected":["餐食配送","客户服务"],"china_note":"外卖平台积极采用AI优化调度，但配送仍依赖人力。","score_source":"MiniMax-Text-01","scoring_model":"MiniMax-Text-01","source_url":"https://news.cctv.com/2025/01/16/ARTIpXTaWK3uPAavQfziBEGk250116.shtml"},{"occ_code":"2-02-04-01","name":"保险代理人","name_en":"Insurance Agent","category":"社会生产服务和生活服务人员","category_en":"Service Workers","sub_group":"金融业务人员","nbs_industry":"金融业","nbs_industry_std":"金融业","employment":800.0,"employment_unit":"万人","avg_wage":86000,"education":"大专及以上","is_new_occ":false,"est_confidence":"M","emp_data_method":"银保监会2023：保险从业人员约900万，其中代理人约800万（高峰期2019年达912万，持续下降中）","market_titles":["保险代理人","保险经纪人","保险销售","理财顾问"],"bls_analog":"Insurance Sales Agents","description_cn":"从事保险产品销售、客户咨询和理赔协助的专业人员","score_near":6,"score_ceiling":8,"score":6,"impact_mode":"mixed","employment_impact_path":"headcount_reduction","policy_adjustment":null,"rationale":"互联网保险平台+AI智能推荐已大幅压缩传统代理人空间。标准化产品销售被线上替代，复杂保障规划仍需人工。行业持续缩编。","tasks_at_risk":["标准产品推荐","保费计算","理赔初审"],"tasks_protected":["复杂保障规划","客户信任建立","理赔纠纷处理"],"china_note":"中国互联网保险渗透率高，保险代理人数量从2019年峰值持续下降。","score_source":"claude-opus-4-6","scoring_model":"claude-opus-4-6","source_url":"https://www.nfra.gov.cn/cn/view/pages/tongjishuju/tongjishuju.html"},{"occ_code":"6-07-03-01","name":"网约车司机","name_en":"Ride-Hailing Driver","category":"社会生产服务和生活服务人员","category_en":"Service Workers","sub_group":"道路运输服务人员","nbs_industry":"交通运输/仓储和邮政业","nbs_industry_std":"交通运输仓储和邮政业","employment":748.0,"employment_unit":"万人","avg_wage":100937,"education":"初中及以上","is_new_occ":false,"est_confidence":"H","emp_data_method":"交通运输部2024.10：网约车驾驶证748万本","market_titles":["网约车司机","出租车司机","滴滴司机","专车司机"],"bls_analog":"Taxi Drivers and Chauffeurs","description_cn":"驾驶车辆提供出行服务；自动驾驶技术发展中但落地周期长，当前仍完全依赖人工","score_near":2,"score_ceiling":9,"score":2,"impact_mode":"augmentation","employment_impact_path":"task_erosion","policy_adjustment":null,"rationale":"当前完全依赖人工驾驶，AI仅辅助导航派单；自动驾驶全面落地后接近全面替代，ceiling应反映技术成熟后的理论上限而非折现值。","tasks_at_risk":["导航路线规划","简单路况驾驶"],"tasks_protected":["复杂路况判断","乘客交互服务","突发状况处理"],"china_note":"百度萝卜快跑等在武汉试点，全面商用仍需5-10年。","score_source":"manual_override","scoring_model":"claude-opus-4-6","source_url":"https://www.mot.gov.cn/shuju/"},{"occ_code":"2-09-01-00","name":"科研人员","name_en":"Research Scientist","category":"专业技术人员","category_en":"Professionals","sub_group":"科学研究人员","nbs_industry":"科学研究和技术服务业","nbs_industry_std":"科学研究和技术服务业","employment":724.0,"employment_unit":"万人","avg_wage":131354,"education":"硕士及以上","is_new_occ":false,"est_confidence":"H","emp_data_method":"国家统计局科技经费公报2023：R&D人员724万人年(全时当量)","market_titles":["研究员","博士后","实验员","技术研发人员"],"bls_analog":"Scientists and Researchers","description_cn":"从事基础研究和应用研究；AI可加速文献检索和数据分析，但假设生成和实验设计仍需人类创造力","score_near":4,"score_ceiling":7,"score":4,"impact_mode":"augmentation","employment_impact_path":"entry_barrier","policy_adjustment":null,"rationale":"Anthropic实测数据：Life & Social Sciences实际AI覆盖接近0，远低于理论值。AI加速文献检索但假设生成和实验设计不可替代，实际渗透极低。","tasks_at_risk":["文献检索与综述","数据统计分析","标准化实验操作"],"tasks_protected":["科学假设生成","实验方案设计","跨学科创新判断"],"china_note":"AI在特定领域（AlphaFold等）有突破，但中国科研AI渗透率整体极低，集中在计算机相关学科。","score_source":"manual_override","scoring_model":"claude-opus-4-6","source_url":"https://www.stats.gov.cn/sj/zxfb/202509/t20250929_1961429.html"},{"occ_code":"3-01-01-01","name":"公务员","name_en":"Civil Servant","category":"办事人员和有关人员","category_en":"Clerical Workers","sub_group":"行政办公人员","nbs_industry":"公共管理/社会保障和社会组织","nbs_industry_std":"公共管理社会保障和社会组织","employment":717.0,"employment_unit":"万人","avg_wage":114840,"education":"本科及以上","is_new_occ":false,"est_confidence":"M","emp_data_method":"人社部2015年底716.7万(最后一次公布)；数据陈旧","market_titles":["公务员","行政人员","政府工作人员","事业单位人员"],"bls_analog":"Government Workers","description_cn":"处理行政审批、政策执行、公共服务管理；涉及大量文件处理和决策","score_near":4,"score_ceiling":6,"score":4,"impact_mode":"mixed","employment_impact_path":"task_erosion","policy_adjustment":null,"rationale":"行政审批和文件处理可被AI辅助，数字政务平台已在推进；但政策执行和公共决策仍需人类。体制稳定性限制实际替代。","tasks_at_risk":["文件起草整理","行政审批流程","数据统计报告"],"tasks_protected":["政策执行决策","群众接待服务","跨部门协调"],"china_note":"公务员体制稳定性极强，即使AI可替代部分任务，编制裁减可能性极低。","score_source":"version_A","scoring_model":"claude-opus-4-6","source_url":"http://politics.people.com.cn/n1/2016/0621/c1001-28464163.html"},{"occ_code":"4-04-01-01","name":"软件工程师","name_en":"Software Engineer","category":"专业技术人员","category_en":"Professionals","sub_group":"软件和信息技术服务人员","nbs_industry":"信息传输/软件和信息技术服务业","nbs_industry_std":"信息传输软件和信息技术服务业","employment":697.3,"employment_unit":"万人","avg_wage":164540,"education":"本科及以上","is_new_occ":false,"est_confidence":"M","emp_data_method":"NBS行业就业1550万×七普构成比45%","market_titles":["前端工程师","后端工程师","全栈工程师","Java工程师","Python工程师"],"bls_analog":"Software Developers","description_cn":"负责软件系统的设计、编码、测试和维护；工作产出完全数字化，可远程完成","score_near":5,"score_ceiling":9,"score":5,"impact_mode":"augmentation","employment_impact_path":"entry_barrier","policy_adjustment":null,"rationale":"AI已深度嵌入编码流程(Copilot日用率51%)，但46%开发者不信任输出需人工验证。增强而非替代，初级岗位收窄。","tasks_at_risk":["样板代码生成","单元测试编写","代码审查辅助"],"tasks_protected":["系统架构设计","需求分析与决策","复杂调试"],"china_note":"中国互联网公司AI工具渗透率与美国接近，但传统软件外包行业渗透较低。","score_source":"consensus_AB","scoring_model":"claude-opus-4-6","source_url":"https://data.stats.gov.cn/easyquery.htm?cn=C01"},{"occ_code":"4-01-03-01","name":"小学教师","name_en":"Primary School Teacher","category":"专业技术人员","category_en":"Professionals","sub_group":"教育教学人员","nbs_industry":"教育","nbs_industry_std":"教育","employment":660.0,"employment_unit":"万人","avg_wage":107000,"education":"大专及以上","is_new_occ":false,"est_confidence":"H","emp_data_method":"教育部2024统计公报：小学专任教师660.08万人","market_titles":["小学教师","小学老师","语文老师","数学老师"],"bls_analog":"Elementary School Teachers","description_cn":"从事小学阶段各学科教学和班级管理的专任教师","score_near":2,"score_ceiling":5,"score":2,"impact_mode":"augmentation","employment_impact_path":"task_erosion","policy_adjustment":"双减政策限制AI教育产品进校园，score_near维持低位","rationale":"小学教育以情感关怀和行为引导为核心，知识传授占比低于中学。AI辅助批改有用但替代性极低。","tasks_at_risk":["作业批改","教案模板生成"],"tasks_protected":["儿童行为引导","情感关怀","家校沟通","课堂纪律管理"],"china_note":"出生率下降导致未来小学教师需求可能收缩，但这是人口因素非AI因素。","score_source":"claude-opus-4-6","scoring_model":"claude-opus-4-6","source_url":"http://www.moe.gov.cn/jyb_sjzl/sjzl_fztjgb/202506/t20250611_1193760.html"},{"occ_code":"5-04-01-01","name":"客服专员","name_en":"Customer Service Representative","category":"办事人员和有关人员","category_en":"Clerical Workers","sub_group":"客户服务人员","nbs_industry":"各行业","nbs_industry_std":"批发和零售业","employment":649.6,"employment_unit":"万人","avg_wage":71397,"education":"大专及以上","is_new_occ":false,"est_confidence":"M","emp_data_method":"NBS行业就业×七普构成比5.8%","market_titles":["客服","在线客服","售前售后","话务员"],"bls_analog":"Customer Service Representatives","description_cn":"解答客户咨询、处理投诉；重复性文本交互，已有大量AI替代","score_near":8,"score_ceiling":9,"score":8,"impact_mode":"displacement","employment_impact_path":"headcount_reduction","policy_adjustment":"中国AI客服渗透全球领先，score_near上调1分","rationale":"中国AI客服渗透率全球领先，智能客服已处理60-80%常规咨询。替代模式明确，在岗人数持续下降。","tasks_at_risk":["常见问题解答","标准化投诉处理","订单查询"],"tasks_protected":["复杂投诉处理","情感支持","跨部门协调"],"china_note":"阿里、京东等平台已大规模部署智能客服，中国AI客服渗透率全球领先。","score_source":"version_A","scoring_model":"claude-opus-4-6","source_url":"https://data.stats.gov.cn/easyquery.htm?cn=C01"},{"occ_code":"4-03-02-01","name":"中学教师","name_en":"Secondary School Teacher","category":"专业技术人员","category_en":"Professionals","sub_group":"教育教学人员","nbs_industry":"教育","nbs_industry_std":"教育","employment":645.1,"employment_unit":"万人","avg_wage":116199,"education":"本科及以上","is_new_occ":false,"est_confidence":"H","emp_data_method":"教育部2024：初中414.88万+高中230.18万","market_titles":["高中教师","初中教师","班主任","学科老师"],"bls_analog":"High School Teachers","description_cn":"讲授学科知识、管理班级；内容传授可被AI辅助，但课堂管理仍需在场","score_near":3,"score_ceiling":6,"score":3,"impact_mode":"mixed","employment_impact_path":"task_erosion","policy_adjustment":"教育部AI应用规范+双减政策，score_near下调1分","rationale":"AI可辅助批改和教案生成，但课堂互动、情感教育和班级管理不可替代。政策严格限制AI进课堂。","tasks_at_risk":["作业批改","教案课件制作","标准化知识传授"],"tasks_protected":["课堂互动","学生心理辅导","班级管理"],"china_note":"双减政策+教育部AI规范限制AI在课堂中的直接应用。","score_source":"consensus_AB","scoring_model":"claude-opus-4-6","source_url":"http://www.moe.gov.cn/jyb_sjzl/sjzl_fztjgb/202506/t20250611_1193760.html"},{"occ_code":"4-07-02-01","name":"注册护士","name_en":"Registered Nurse","category":"专业技术人员","category_en":"Professionals","sub_group":"卫生专业技术人员","nbs_industry":"卫生和社会工作","nbs_industry_std":"卫生和社会工作","employment":585.5,"employment_unit":"万人","avg_wage":123777,"education":"大专及以上","is_new_occ":false,"est_confidence":"H","emp_data_method":"卫健委2024公报：注册护士585.5万","market_titles":["护士","护理师","ICU护士"],"bls_analog":"Registered Nurses","description_cn":"执行护理操作、观察病情；高度依赖物理在场和人际交互","score_near":2,"score_ceiling":4,"score":2,"impact_mode":"augmentation","employment_impact_path":"demand_growth","policy_adjustment":null,"rationale":"护理核心为物理操作和人际照料，AI仅能辅助电子病历和监测数据处理。老龄化带动需求持续增长。","tasks_at_risk":["电子病历录入","基础健康监测数据处理"],"tasks_protected":["患者护理操作","病情观察判断","医患沟通"],"china_note":"中国老龄化加速，护士缺口大，AI渗透率极低。","score_source":"consensus_AB","scoring_model":"claude-opus-4-6","source_url":"https://www.nhc.gov.cn/guihuaxxs/c100133/202512/f1c3a3c617484a27a1a26a468afbaeee.shtml"},{"occ_code":"4-07-01-01","name":"执业医师","name_en":"Licensed Physician","category":"专业技术人员","category_en":"Professionals","sub_group":"卫生专业技术人员","nbs_industry":"卫生和社会工作","nbs_industry_std":"卫生和社会工作","employment":508.2,"employment_unit":"万人","avg_wage":123777,"education":"本科及以上","is_new_occ":false,"est_confidence":"H","emp_data_method":"卫健委2024公报：执业(助理)医师508.2万","market_titles":["医生","内科医生","外科医生","全科医生"],"bls_analog":"Physicians and Surgeons","description_cn":"诊断和治疗疾病；需要物理检查和实时人机交互，不可完全数字化","score_near":3,"score_ceiling":6,"score":3,"impact_mode":"augmentation","employment_impact_path":"entry_barrier","policy_adjustment":"NMPA三类医疗器械审批门槛高，score_near下调1分","rationale":"AI辅助影像判读已有落地，但临床诊断、手术和医患沟通不可替代。监管严格限制AI独立执业。","tasks_at_risk":["影像初步判读","病历整理","药物交互检查"],"tasks_protected":["临床诊断决策","手术操作","医患沟通"],"china_note":"NMPA对AI医疗器械审批严格，AI辅助诊断须作为医疗器械注册，落地周期长。","score_source":"consensus_AB","scoring_model":"claude-opus-4-6","source_url":"https://www.nhc.gov.cn/guihuaxxs/c100133/202512/f1c3a3c617484a27a1a26a468afbaeee.shtml"},{"occ_code":"4-01-04-01","name":"收银员","name_en":"Cashier","category":"社会生产服务和生活服务人员","category_en":"Service Workers","sub_group":"商品销售人员","nbs_industry":"批发和零售业","nbs_industry_std":"批发和零售业","employment":500.0,"employment_unit":"万人","avg_wage":48000,"education":"初中及以上","is_new_occ":false,"est_confidence":"L","emp_data_method":"行业估算：超市/便利店/餐饮收银岗位约500万，自助收银普及后持续下降","market_titles":["收银员","出纳员","超市收银"],"bls_analog":"Cashiers","description_cn":"在零售、餐饮等场所负责商品结算和收款的人员","score_near":7,"score_ceiling":9,"score":7,"impact_mode":"displacement","employment_impact_path":"headcount_reduction","policy_adjustment":null,"rationale":"移动支付+自助结账已大规模替代传统收银。中国移动支付普及率全球第一，无人收银场景快速扩张。","tasks_at_risk":["商品扫码结算","现金找零","简单客户咨询"],"tasks_protected":["退换货处理","会员服务","防损监控"],"china_note":"中国移动支付普及率超86%，自助结账在一二线城市超市覆盖率已超50%。","score_source":"claude-opus-4-6","scoring_model":"claude-opus-4-6","source_url":"https://data.stats.gov.cn/easyquery.htm?cn=C01"},{"occ_code":"6-07-01-01","name":"快递员","name_en":"Express Delivery Worker","category":"社会生产服务和生活服务人员","category_en":"Service Workers","sub_group":"道路运输服务人员","nbs_industry":"交通运输/仓储和邮政业","nbs_industry_std":"交通运输仓储和邮政业","employment":450.5,"employment_unit":"万人","avg_wage":100937,"education":"初中及以上","is_new_occ":false,"est_confidence":"M","emp_data_method":"NBS行业就业×七普构成比32.3%","market_titles":["快递员","同城配送员","仓储分拣员"],"bls_analog":"Couriers and Messengers","description_cn":"完成包裹取件和派送；需要物理移动，短期内抗AI替代","score_near":1,"score_ceiling":3,"score":1,"impact_mode":"augmentation","employment_impact_path":"demand_growth","policy_adjustment":null,"rationale":"末端配送完全依赖物理移动和复杂环境导航，AI仅辅助路线规划和分拣。电商增长带动需求扩张。","tasks_at_risk":["路线规划优化","仓储分拣"],"tasks_protected":["上门取件派送","复杂路况配送","客户签收交互"],"china_note":"中国物流AI集中在仓储分拣，末端配送完全依赖人力。","score_source":"version_A","scoring_model":"claude-opus-4-6","source_url":"https://www.spb.gov.cn/"},{"occ_code":"6-05-01-01","name":"仓储物流管理员","name_en":"Warehouse / Logistics Operator","category":"社会生产服务和生活服务人员","category_en":"Service Workers","sub_group":"仓储物流人员","nbs_industry":"交通运输/仓储和邮政业","nbs_industry_std":"交通运输仓储和邮政业","employment":400.0,"employment_unit":"万人","avg_wage":72000,"education":"初中及以上","is_new_occ":false,"est_confidence":"M","emp_data_method":"NBS交通运输仓储邮政业就业×仓储物流岗位构成比约28%","market_titles":["仓库管理员","物流专员","分拣员","调度员"],"bls_analog":"Shipping and Receiving Clerks","description_cn":"从事仓储管理、货物分拣、库存盘点和物流调度的人员","score_near":4,"score_ceiling":7,"score":4,"impact_mode":"augmentation","employment_impact_path":"task_erosion","policy_adjustment":null,"rationale":"智能仓储系统（AGV、自动分拣）已在头部电商大规模部署，但中小仓库仍依赖人力。库存预测和调度优化AI化程度高。","tasks_at_risk":["库存盘点","标准分拣","路线调度优化"],"tasks_protected":["异常货物处理","现场安全管理","客户发货协调"],"china_note":"京东、菜鸟智能仓库AI化程度全球领先，但中小物流企业仍以人力为主。","score_source":"claude-opus-4-6","scoring_model":"claude-opus-4-6","source_url":"https://data.stats.gov.cn/easyquery.htm?cn=C01"},{"occ_code":"5-01-02-01","name":"营销策划人员","name_en":"Marketing Planner","category":"办事人员和有关人员","category_en":"Clerical Workers","sub_group":"销售人员","nbs_industry":"批发和零售业","nbs_industry_std":"批发和零售业","employment":380.8,"employment_unit":"万人","avg_wage":71397,"education":"大专及以上","is_new_occ":false,"est_confidence":"M","emp_data_method":"NBS行业就业11200万×七普构成比3.4%","market_titles":["市场专员","品牌策划","内容运营","新媒体运营"],"bls_analog":"Marketing Specialists","description_cn":"策划营销活动、撰写内容；创意和文字工作AI介入度高","score_near":6,"score_ceiling":8,"score":6,"impact_mode":"mixed","employment_impact_path":"task_erosion","policy_adjustment":"电商运营高度AI化，score_near上调0.5分","rationale":"文案撰写和内容生成高度可自动化，AIGC工具已广泛使用；品牌战略仍需人类。职业从执行型向策略型转变。","tasks_at_risk":["营销文案撰写","数据分析报告","社媒内容批量生成"],"tasks_protected":["品牌战略制定","跨部门沟通","创意方向决策"],"china_note":"中国电商和直播行业AI化程度全球领先，智能选品和自动投放已常态化。","score_source":"version_A","scoring_model":"claude-opus-4-6","source_url":"https://data.stats.gov.cn/easyquery.htm?cn=C01"},{"occ_code":"5-01-01-01","name":"电话销售","name_en":"Telemarketer","category":"办事人员和有关人员","category_en":"Clerical Workers","sub_group":"销售人员","nbs_industry":"跨行业","nbs_industry_std":"批发和零售业","employment":300.0,"employment_unit":"万人","avg_wage":60000,"education":"大专及以上","is_new_occ":false,"est_confidence":"L","emp_data_method":"行业分类估算（outbound口径，剔除与客服专员重叠）：金融/保险/房产/教育行业外呼电销专员约300万；中国呼叫中心坐席总数405万（智研咨询2023）含inbound客服，本条仅统计以主动外呼为主要工作的电销岗位","market_titles":["电话销售","电销专员","外呼坐席","电话客服"],"bls_analog":"Telemarketers","description_cn":"通过电话进行产品推销、客户开发和销售转化的人员","score_near":8,"score_ceiling":9,"score":8,"impact_mode":"displacement","employment_impact_path":"headcount_reduction","policy_adjustment":null,"rationale":"AI外呼机器人已大规模部署，日拨打量是人工的10倍以上。标准化话术场景几乎完全可替代，仅高价值客户沟通保留人工。典型displacement。","tasks_at_risk":["标准话术外呼","客户初筛","预约确认"],"tasks_protected":["高价值客户深度沟通","复杂需求挖掘"],"china_note":"中国AI外呼渗透率全球最高，科大讯飞等厂商外呼机器人已覆盖金融、房产等行业。","score_source":"claude-opus-4-6","scoring_model":"claude-opus-4-6","source_url":"https://data.stats.gov.cn/easyquery.htm?cn=C01"},{"occ_code":"2-02-01-01","name":"银行柜员","name_en":"Bank Teller / Loan Officer","category":"办事人员和有关人员","category_en":"Clerical Workers","sub_group":"金融业务人员","nbs_industry":"金融业","nbs_industry_std":"金融业","employment":300.0,"employment_unit":"万人","avg_wage":150000,"education":"本科及以上","is_new_occ":false,"est_confidence":"M","emp_data_method":"银行业协会2023：银行业从业人员380万，其中柜面及信贷岗位约300万（网点持续收缩中）","market_titles":["银行柜员","信贷经理","客户经理","理财经理"],"bls_analog":"Bank Tellers","description_cn":"在银行网点从事柜台业务办理、信贷审批和客户服务的人员","score_near":7,"score_ceiling":9,"score":7,"impact_mode":"displacement","employment_impact_path":"headcount_reduction","policy_adjustment":"金融监管要求关键业务人工复核，score_near维持7而非更高","rationale":"手机银行替代90%以上柜面交易，AI信审已大规模部署。银行网点持续裁撤，从业人数逐年下降。","tasks_at_risk":["柜台交易处理","贷款初审","账户管理"],"tasks_protected":["复杂金融产品咨询","大额信贷决策","合规审查"],"china_note":"六大行网点数量连续5年净减少，手机银行替代率超95%。","score_source":"claude-opus-4-6","scoring_model":"claude-opus-4-6","source_url":"https://cn.afca-asia.org/Portal.do?method=memberDetailView&returnChannelID=29&resourceID=1"},{"occ_code":"4-03-01-01","name":"幼儿教师","name_en":"Preschool Teacher","category":"专业技术人员","category_en":"Professionals","sub_group":"教育教学人员","nbs_industry":"教育","nbs_industry_std":"教育","employment":283.0,"employment_unit":"万人","avg_wage":116199,"education":"大专及以上","is_new_occ":false,"est_confidence":"H","emp_data_method":"教育部2024统计公报：学前教育专任教师283.19万","market_titles":["幼儿园教师","幼教","保教老师","早教老师"],"bls_analog":"Preschool Teachers","description_cn":"组织幼儿学习和游戏活动；高度依赖物理照料和情感互动，极低AI可替代性","score_near":1,"score_ceiling":3,"score":1,"impact_mode":"augmentation","employment_impact_path":"demand_growth","policy_adjustment":null,"rationale":"幼教核心为物理照料和情感互动，3-6岁儿童需要身体接触和面对面引导，AI几乎无法介入。学前教育政策带动需求。","tasks_at_risk":["教学素材准备"],"tasks_protected":["幼儿日常照料","情感互动引导","游戏活动组织"],"china_note":"中国学前教育仍在扩容阶段，幼师缺口大，政策鼓励师资增加。","score_source":"version_A","scoring_model":"claude-opus-4-6","source_url":"http://www.moe.gov.cn/jyb_sjzl/sjzl_fztjgb/202506/t20250611_1193760.html"},{"occ_code":"6-01-01-03","name":"车床操作工","name_en":"Lathe Operator","category":"生产制造及有关人员","category_en":"Production Workers","sub_group":"机械制造加工人员","nbs_industry":"制造业","nbs_industry_std":"制造业","employment":281.1,"employment_unit":"万人","avg_wage":91556,"education":"中职及以上","is_new_occ":false,"est_confidence":"M","emp_data_method":"NBS行业就业×七普构成比4.2%","market_titles":["车工","数控车床操作工","CNC操作员"],"bls_analog":"Machinists","description_cn":"操作金属切削机床加工零件；需要物理操作，高度依赖实体技能","score_near":2,"score_ceiling":4,"score":2,"impact_mode":"augmentation","employment_impact_path":"task_erosion","policy_adjustment":null,"rationale":"工作核心为物理操作和现场判断，数控编程可被AI辅助但手工调整不可替代。AI影响主要在数控升级层面。","tasks_at_risk":["数控编程","零件尺寸初步检测"],"tasks_protected":["复杂零件手工调整","现场故障诊断","高精度加工操作"],"china_note":"中国制造业智能化改造推进中，但车床操作等基础岗位受AI影响有限。","score_source":"version_A","scoring_model":"claude-opus-4-6","source_url":"https://data.stats.gov.cn/easyquery.htm?cn=C01"},{"occ_code":"4-08-01-01","name":"建筑工程师","name_en":"Civil Engineer","category":"专业技术人员","category_en":"Professionals","sub_group":"工程技术人员","nbs_industry":"建筑业","nbs_industry_std":"建筑业","employment":209.5,"employment_unit":"万人","avg_wage":80701,"education":"本科及以上","is_new_occ":false,"est_confidence":"M","emp_data_method":"NBS行业就业×七普构成比9.8%","market_titles":["结构工程师","建筑设计师","土木工程师"],"bls_analog":"Civil Engineers","description_cn":"设计建筑结构、审核图纸；部分设计工作可被AI辅助，现场勘查不可替代","score_near":4,"score_ceiling":6,"score":4,"impact_mode":"augmentation","employment_impact_path":"entry_barrier","policy_adjustment":null,"rationale":"AI辅助结构设计和图纸审核已在推进，但现场勘查和复杂决策不可替代。增强为主，初级设计岗位受冲击。","tasks_at_risk":["图纸审核","结构设计优化","初步设计草图"],"tasks_protected":["现场勘查","复杂结构决策","施工问题解决"],"china_note":"中国建筑行业BIM和AI辅助设计工具开始推广但尚未普及。","score_source":"version_A","scoring_model":"claude-opus-4-6","source_url":"https://data.stats.gov.cn/easyquery.htm?cn=C01"},{"occ_code":"6-07-06-01","name":"电工","name_en":"Electrician","category":"生产制造及有关人员","category_en":"Production Workers","sub_group":"电力和电气设备安装人员","nbs_industry":"电力/热力/燃气及水生产和供应业","nbs_industry_std":"电力热力燃气及水生产和供应业","employment":200.0,"employment_unit":"万人","avg_wage":138975,"education":"中职及以上","is_new_occ":false,"est_confidence":"M","emp_data_method":"NBS电力行业就业411万×技术工构成比49%","market_titles":["电工","维修电工","高压电工","配电工"],"bls_analog":"Electricians","description_cn":"安装维护电气系统和设备；需要物理操作和现场判断，安全要求极高","score_near":1,"score_ceiling":3,"score":1,"impact_mode":"augmentation","employment_impact_path":"task_erosion","policy_adjustment":null,"rationale":"电气安装维护完全依赖现场物理操作和安全判断，AI仅能辅助故障诊断参考。特种作业要求极高。","tasks_at_risk":["故障诊断参考查询"],"tasks_protected":["电气设备安装","现场安全判断","高压作业操作"],"china_note":"电工属特种作业，持证上岗且安全监管严格，AI几乎无法介入。","score_source":"version_A","scoring_model":"claude-opus-4-6","source_url":"https://data.stats.gov.cn/easyquery.htm?cn=C01"},{"occ_code":"2-06-03-01","name":"HR专员","name_en":"Human Resources Specialist","category":"专业技术人员","category_en":"Professionals","sub_group":"人力资源管理人员","nbs_industry":"跨行业","nbs_industry_std":"租赁和商务服务业","employment":200.0,"employment_unit":"万人","avg_wage":95000,"education":"本科及以上","is_new_occ":false,"est_confidence":"L","emp_data_method":"行业估算：企业HR岗位约200万（含招聘、薪酬、培训、员工关系），无权威统计","market_titles":["HR","人事专员","招聘专员","HRBP"],"bls_analog":"Human Resources Specialists","description_cn":"从事招聘、薪酬管理、员工培训和劳动关系处理的人力资源管理人员","score_near":5,"score_ceiling":7,"score":5,"impact_mode":"augmentation","employment_impact_path":"task_erosion","policy_adjustment":null,"rationale":"AI简历筛选和面试初评已广泛使用，薪酬核算可自动化；但员工关系、文化建设和复杂沟通不可替代。","tasks_at_risk":["简历筛选","薪酬核算","考勤统计"],"tasks_protected":["员工关系处理","组织文化建设","复杂面试评估"],"china_note":"BOSS直聘等平台已深度嵌入AI匹配，但中国企业劳动关系复杂性高于西方。","score_source":"claude-opus-4-6","scoring_model":"claude-opus-4-6","source_url":"https://data.stats.gov.cn/easyquery.htm?cn=C01"},{"occ_code":"5-02-01-01","name":"外贸跟单员","name_en":"Foreign Trade Specialist","category":"办事人员和有关人员","category_en":"Clerical Workers","sub_group":"商务服务人员","nbs_industry":"批发和零售业","nbs_industry_std":"批发和零售业","employment":200.0,"employment_unit":"万人","avg_wage":85000,"education":"大专及以上","is_new_occ":false,"est_confidence":"L","emp_data_method":"行业估算：外贸企业约65万家×平均3名跟单/业务人员，约200万","market_titles":["外贸业务员","跟单员","单证员","报关员"],"bls_analog":"Customs Brokers","description_cn":"从事国际贸易订单跟进、单证处理和客户沟通的商务人员","score_near":6,"score_ceiling":8,"score":6,"impact_mode":"mixed","employment_impact_path":"task_erosion","policy_adjustment":null,"rationale":"AI翻译+跨境电商平台自动化大幅压缩传统外贸流程。单证处理、邮件沟通、报关申报可被AI完成；客户关系和复杂谈判仍需人工。","tasks_at_risk":["单证制作","邮件翻译沟通","报关申报"],"tasks_protected":["客户关系维护","价格谈判","质量验货"],"china_note":"阿里国际站、Temu等跨境电商平台AI化程度高，传统外贸公司加速转型。","score_source":"claude-opus-4-6","scoring_model":"claude-opus-4-6","source_url":"https://data.stats.gov.cn/easyquery.htm?cn=C01"},{"occ_code":"4-01-02-01","name":"房地产经纪人","name_en":"Real Estate Agent","category":"社会生产服务和生活服务人员","category_en":"Service Workers","sub_group":"房地产服务人员","nbs_industry":"房地产业","nbs_industry_std":"房地产业","employment":165.0,"employment_unit":"万人","avg_wage":73946,"education":"大专及以上","is_new_occ":false,"est_confidence":"M","emp_data_method":"中房协2023年报：186.7万；2024年行业持续下行，活跃经纪人估算165万（-12%）","market_titles":["房产经纪","中介","置业顾问","房产销售"],"bls_analog":"Real Estate Brokers","description_cn":"从事房屋买卖租赁中介服务、带看和交易撮合的人员","score_near":5,"score_ceiling":8,"score":5,"impact_mode":"mixed","employment_impact_path":"task_erosion","policy_adjustment":null,"rationale":"房源匹配和推荐高度可数字化，AI+VR看房已落地；但实地带看、谈判和信任建立不可替代。房地产下行使就业量持续萎缩。","tasks_at_risk":["房源匹配推荐","基础客户咨询","合同模板生成"],"tasks_protected":["实地带看服务","价格谈判","客户信任建立"],"china_note":"2024年房地产持续下行，活跃经纪人较2023年减少约12%。贝壳VR看房+AI推荐已成标配。","score_source":"claude-opus-4-6","scoring_model":"claude-opus-4-6","source_url":"https://www.fang.com/news/2024/"},{"occ_code":"4-04-05-01","name":"数据分析师","name_en":"Data Analyst","category":"专业技术人员","category_en":"Professionals","sub_group":"软件和信息技术服务人员","nbs_industry":"信息传输/软件和信息技术服务业","nbs_industry_std":"信息传输软件和信息技术服务业","employment":155.0,"employment_unit":"万人","avg_wage":164540,"education":"本科及以上","is_new_occ":false,"est_confidence":"M","emp_data_method":"NBS行业就业×七普构成比10.0%","market_titles":["数据分析师","BI工程师","数据挖掘工程师","算法工程师"],"bls_analog":"Data Scientists","description_cn":"从数据中提取业务洞察；核心工作为信息处理，AI替代度极高","score_near":6,"score_ceiling":9,"score":6,"impact_mode":"mixed","employment_impact_path":"task_erosion","policy_adjustment":null,"rationale":"数据清洗、可视化和初步分析已可被AI高效完成，但业务洞察和决策支持仍需行业知识。基础分析岗位正在收缩。","tasks_at_risk":["数据清洗","基础统计分析","数据可视化"],"tasks_protected":["业务洞察解读","跨部门沟通","复杂决策支持"],"china_note":null,"score_source":"version_A","scoring_model":"claude-opus-4-6","source_url":"https://data.stats.gov.cn/easyquery.htm?cn=C01"},{"occ_code":"3-01-02-06","name":"平面/UI设计师","name_en":"Graphic / UI Designer","category":"专业技术人员","category_en":"Professionals","sub_group":"文化艺术人员","nbs_industry":"各行业","nbs_industry_std":"文化体育和娱乐业","employment":150.0,"employment_unit":"万人","avg_wage":87417,"education":"大专及以上","is_new_occ":false,"est_confidence":"L","emp_data_method":"行业报告估算：互联网设计51万+平面设计约100万","market_titles":["平面设计师","UI设计师","视觉设计师","美工"],"bls_analog":"Graphic Designers","description_cn":"设计视觉内容、用户界面和品牌物料；AIGC工具已可生成高质量设计稿","score_near":6,"score_ceiling":8,"score":6,"impact_mode":"mixed","employment_impact_path":"task_erosion","policy_adjustment":null,"rationale":"AIGC工具已可生成高质量设计稿，基础设计执行被大幅替代；品牌调性和UX策略仍需人类。初级设计岗位正在收缩。","tasks_at_risk":["基础图形设计","海报banner批量生成","配色方案建议"],"tasks_protected":["品牌视觉策略","用户体验设计","创意方向决策"],"china_note":"中国电商对设计效率要求极高，AIGC设计工具在电商美工领域渗透率已很高。","score_source":"version_A","scoring_model":"claude-opus-4-6","source_url":"https://data.stats.gov.cn/easyquery.htm?cn=C01"},{"occ_code":"3-02-05-04","name":"影视内容创作者","name_en":"Digital Content Creator","category":"专业技术人员","category_en":"Professionals","sub_group":"文化艺术人员","nbs_industry":"文化/体育和娱乐业","nbs_industry_std":"文化体育和娱乐业","employment":120.1,"employment_unit":"万人","avg_wage":87417,"education":"大专及以上","is_new_occ":true,"est_confidence":"L","emp_data_method":"行业估算；L级，仅为保守估算不含大量兼职","market_titles":["短视频博主","UP主","直播达人","AIGC创作者"],"bls_analog":"","description_cn":"通过视频平台发布内容获取收益；2021年新职业，与AIGC工具高度融合","score_near":5,"score_ceiling":8,"score":5,"impact_mode":"mixed","employment_impact_path":"task_erosion","policy_adjustment":"AIGC标注审核要求，score_near下调1分","rationale":"AIGC工具已可生成脚本、剪辑和特效，降低创作门槛；但真人出镜和现场互动不可替代。AIGC标注要求限制纯AI内容。","tasks_at_risk":["视频脚本撰写","剪辑与特效制作","内容创意生成"],"tasks_protected":["真人出镜表演","现场互动直播","品牌商务谈判"],"china_note":"网信办要求AIGC内容须标注审核，限制纯AI生成内容直接发布。","score_source":"consensus_AB","scoring_model":"claude-opus-4-6","source_url":"https://data.stats.gov.cn/easyquery.htm?cn=C01"},{"occ_code":"2-06-04-01","name":"翻译","name_en":"Translator / Interpreter","category":"专业技术人员","category_en":"Professionals","sub_group":"翻译人员","nbs_industry":"各行业","nbs_industry_std":"租赁和商务服务业","employment":103.0,"employment_unit":"万人","avg_wage":77604,"education":"本科及以上","is_new_occ":false,"est_confidence":"H","emp_data_method":"中国翻译协会2024报告：专职翻译103.1万","market_titles":["笔译员","口译员","同声传译","本地化翻译"],"bls_analog":"Translators and Interpreters","description_cn":"将文本或语音从一种语言转换为另一种；核心产出完全数字化，AI翻译质量已接近人类","score_near":8,"score_ceiling":9,"score":8,"impact_mode":"displacement","employment_impact_path":"headcount_reduction","policy_adjustment":null,"rationale":"机器翻译质量已接近人类(尤其笔译)，企业大量转向AI翻译+人工校对，专职翻译岗位持续收缩。典型displacement。","tasks_at_risk":["常规笔译","技术文档翻译","字幕翻译"],"tasks_protected":["高端同声传译","文学翻译","涉密外交翻译"],"china_note":null,"score_source":"version_A","scoring_model":"claude-opus-4-6","source_url":"https://www.tac-online.org.cn/"},{"occ_code":"2-06-07-01","name":"记者/编辑","name_en":"Journalist / Editor","category":"专业技术人员","category_en":"Professionals","sub_group":"新闻出版人员","nbs_industry":"文化/体育和娱乐业","nbs_industry_std":"文化体育和娱乐业","employment":100.0,"employment_unit":"万人","avg_wage":87417,"education":"本科及以上","is_new_occ":false,"est_confidence":"M","emp_data_method":"中国记协：新闻从业人员逾百万","market_titles":["记者","编辑","新闻记者","自媒体编辑"],"bls_analog":"Reporters and Editors","description_cn":"采访新闻事件、撰写稿件、编辑出版内容；AI已可自动生成新闻报道和内容摘要","score_near":7,"score_ceiling":8,"score":7,"impact_mode":"mixed","employment_impact_path":"task_erosion","policy_adjustment":"AIGC标注审核要求，基础分7，policy下调后取整维持7","rationale":"AI已可自动生成快讯和简报，基础编辑被替代程度与翻译相近；但深度调查和独家采访不可替代。AIGC标注要求限制纯AI新闻。","tasks_at_risk":["快讯生成","内容摘要","基础稿件编辑"],"tasks_protected":["深度调查报道","独家信源采访","内容把关判断"],"china_note":"网信办AIGC内容须标注和人工审核（2023年起），限制纯AI新闻发布。","score_source":"manual_override","scoring_model":"claude-opus-4-6","source_url":"http://www.zgjx.cn/"},{"occ_code":"2-06-02-01","name":"审计员","name_en":"Auditor","category":"专业技术人员","category_en":"Professionals","sub_group":"财务审计人员","nbs_industry":"跨行业","nbs_industry_std":"租赁和商务服务业","employment":50.0,"employment_unit":"万人","avg_wage":140000,"education":"本科及以上","is_new_occ":false,"est_confidence":"M","emp_data_method":"中注协2024：注册会计师36万+审计署/内审系统约14万","market_titles":["审计员","审计师","内审","外审"],"bls_analog":"Auditors","description_cn":"从事财务审计、内部控制评价和合规检查的专业人员","score_near":7,"score_ceiling":9,"score":7,"impact_mode":"mixed","employment_impact_path":"task_erosion","policy_adjustment":null,"rationale":"底稿编制、抽样和数据核对高度可自动化。AI审计工具渗透快，四大已全面部署。复杂判断和职业怀疑仍不可替代。","tasks_at_risk":["审计底稿编制","数据抽样核对","标准化测试"],"tasks_protected":["重大风险判断","舞弊识别","审计报告签发"],"china_note":"四大会计师事务所在中国已全面部署AI审计工具，中小所跟进中。","score_source":"claude-opus-4-6","scoring_model":"claude-opus-4-6","source_url":"https://www.cicpa.org.cn/"},{"occ_code":"4-04-06-01","name":"网络安全工程师","name_en":"Cybersecurity Engineer","category":"专业技术人员","category_en":"Professionals","sub_group":"软件和信息技术服务人员","nbs_industry":"信息传输/软件和信息技术服务业","nbs_industry_std":"信息传输软件和信息技术服务业","employment":46.5,"employment_unit":"万人","avg_wage":164540,"education":"本科及以上","is_new_occ":false,"est_confidence":"M","emp_data_method":"NBS行业就业×七普构成比3.0%","market_titles":["安全工程师","渗透测试工程师","信息安全专员"],"bls_analog":"Information Security Analysts","description_cn":"负责系统安全防护和漏洞分析；AI可辅助检测，但对抗性判断仍需人类","score_near":6,"score_ceiling":8,"score":6,"impact_mode":"adversarial","employment_impact_path":"demand_growth","policy_adjustment":null,"rationale":"AI同时提升攻击和防御能力，对抗性质决定AI进步增加安全工程师需求。AI辅助检测已普及，但复杂攻防仍需人类。","tasks_at_risk":["威胁模式识别","日志分析","基础漏洞扫描"],"tasks_protected":["复杂攻击场景分析","安全策略制定","应急响应决策"],"china_note":"中国关键基础设施网络安全监管严格，网安人才缺口大。","score_source":"version_A","scoring_model":"claude-opus-4-6","source_url":"https://data.stats.gov.cn/easyquery.htm?cn=C01"},{"occ_code":"2-06-05-01","name":"法务人员","name_en":"Legal Counsel","category":"专业技术人员","category_en":"Professionals","sub_group":"法律及相关从业人员","nbs_industry":"各行业","nbs_industry_std":"租赁和商务服务业","employment":44.7,"employment_unit":"万人","avg_wage":77604,"education":"本科及以上","is_new_occ":false,"est_confidence":"M","emp_data_method":"NBS行业就业×七普构成比1.0%","market_titles":["法务专员","合规专员","律师助理","法律顾问"],"bls_analog":"Lawyers / Paralegals","description_cn":"处理合同审查、法律文书；文本处理密集，AI可大幅替代常规法律文书","score_near":4,"score_ceiling":8,"score":4,"impact_mode":"mixed","employment_impact_path":"entry_barrier","policy_adjustment":"数据隐私和律师-客户保密要求限制AI工具在法律场景的实际部署，score_near下调1分","rationale":"合同审查和法律检索高度可自动化，但复杂案件分析和客户谈判仍需人类。数据隐私监管限制AI实际渗透，初级法务岗位收窄。","tasks_at_risk":["合同审查","法律检索","标准化文书撰写"],"tasks_protected":["复杂案件分析","客户谈判","法律策略制定"],"china_note":"数据隐私法和律师-客户特权要求AI工具须人工监督，限制实际部署速度。","score_source":"manual_override","scoring_model":"claude-opus-4-6","source_url":"https://data.stats.gov.cn/easyquery.htm?cn=C01"},{"occ_code":"4-04-03-01","name":"产品经理","name_en":"Product Manager","category":"专业技术人员","category_en":"Professionals","sub_group":"软件和信息技术服务人员","nbs_industry":"信息传输/软件和信息技术服务业","nbs_industry_std":"信息传输软件和信息技术服务业","employment":30.0,"employment_unit":"万人","avg_wage":164540,"education":"本科及以上","is_new_occ":false,"est_confidence":"L","emp_data_method":"行业估算：互联网产品经理约20-30万","market_titles":["产品经理","PM","产品总监","需求分析师"],"bls_analog":"Product Managers","description_cn":"定义产品需求、协调研发与业务；涉及用户洞察、数据分析和跨部门沟通","score_near":5,"score_ceiling":7,"score":5,"impact_mode":"augmentation","employment_impact_path":"entry_barrier","policy_adjustment":null,"rationale":"AI可辅助需求分析和PRD撰写，但用户洞察和跨部门协调仍需人类判断。增强为主，初级PM岗位受冲击。","tasks_at_risk":["竞品分析报告","PRD初稿撰写","数据指标监控"],"tasks_protected":["用户洞察判断","跨部门沟通协调","产品战略决策"],"china_note":null,"score_source":"version_A","scoring_model":"claude-opus-4-6","source_url":"https://data.stats.gov.cn/easyquery.htm?cn=C01"},{"occ_code":"4-04-02-01","name":"人工智能训练师","name_en":"AI Training Specialist","category":"专业技术人员","category_en":"Professionals","sub_group":"软件和信息技术服务人员","nbs_industry":"信息传输/软件和信息技术服务业","nbs_industry_std":"信息传输软件和信息技术服务业","employment":23.2,"employment_unit":"万人","avg_wage":164540,"education":"本科及以上","is_new_occ":true,"est_confidence":"L","emp_data_method":"NBS行业就业×七普构成比1.5%","market_titles":["AI训练师","数据标注工程师","RLHF工程师","提示词工程师"],"bls_analog":"","description_cn":"负责AI模型的数据标注、训练优化和效果评估；2019年新职业","score_near":5,"score_ceiling":7,"score":5,"impact_mode":"adversarial","employment_impact_path":"demand_growth","policy_adjustment":null,"rationale":"AI进步同时增加标注和对齐需求，基础标注可自动化但RLHF等复杂任务仍需人工，需求随AI产业扩张而增长。","tasks_at_risk":["基础图像文本标注","简单分类任务","重复性数据清洗"],"tasks_protected":["复杂场景标注","模型效果评估","对齐策略制定"],"china_note":"中国AI产业快速扩张，数据标注需求旺盛，行业集中在低成本地区。","score_source":"version_A","scoring_model":"claude-opus-4-6","source_url":"https://data.stats.gov.cn/easyquery.htm?cn=C01"},{"occ_code":"2-02-07-04","name":"证券投资分析员","name_en":"Securities Analyst","category":"专业技术人员","category_en":"Professionals","sub_group":"金融业务人员","nbs_industry":"金融业","nbs_industry_std":"金融业","employment":22.7,"employment_unit":"万人","avg_wage":186527,"education":"本科及以上","is_new_occ":false,"est_confidence":"M","emp_data_method":"NBS行业就业×七普构成比2.2%","market_titles":["金融分析师","研究员","投资分析师","量化研究员"],"bls_analog":"Financial Analysts","description_cn":"分析证券市场数据、撰写研究报告；核心工作为信息处理和报告生成","score_near":6,"score_ceiling":9,"score":6,"impact_mode":"mixed","employment_impact_path":"task_erosion","policy_adjustment":"金融监管要求人工复核，score_near下调1分","rationale":"研报撰写和数据分析高度可数字化，AI已能生成初稿；但投资决策、客户关系和监管合规仍需人类。","tasks_at_risk":["市场数据分析","研究报告初稿","趋势预测建模"],"tasks_protected":["投资决策判断","客户沟通","合规审查"],"china_note":"银保监穿透式监管要求算法决策须人工复核，限制AI直接替代。","score_source":"version_A","scoring_model":"claude-opus-4-6","source_url":"https://data.stats.gov.cn/easyquery.htm?cn=C01"}];
+data = DATA_INLINE; computeStats(); resize();
+window.addEventListener("resize", resize);
+</script>
+
+<footer style="position:fixed;bottom:0;left:0;right:0;background:var(--bg);border-top:1px solid rgba(255,255,255,0.1);padding:8px 0;z-index:200">
+  <p style="font-size:11px;opacity:0.6;text-align:center;margin:0;line-height:1.7;padding:0 20px">
+    高分 ≠ 职业消失。评分反映目前职业的AI暴露度，不计入需求弹性、监管约束与企业实际部署节奏。
+    实际暴露度为当前实际冲击，理论暴露度为技术可行上限，差值体现暴露度与理论能力的缺口。许多高暴露职业将被重塑，而非消失。
+  </p>
+</footer>
+
+</body>
+</html>
