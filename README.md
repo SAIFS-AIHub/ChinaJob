@@ -1,4 +1,4 @@
-# 中国职业 AI 暴露度分析 🇨
+# 中国职业 AI 暴露度分析 
 
 [在线演示](https://saifs-aihub.github.io/ChinaJob/ChinaAIExposure.html)
 [数据版本]()
