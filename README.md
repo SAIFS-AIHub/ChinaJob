@@ -12,9 +12,9 @@
 
 ## 🎯 项目特色
 
-### 双分数体系（全球首创）
-- **近期分数 (score_near)**: 评估当前至2027年的实际 AI 渗透情况
-- **理论上限 (score_ceiling)**: 评估5-10年内技术可行性的上限
+### 双分数体系
+- **近期实际暴露度 (score_near)**: 评估当前至2027年的实际 AI 渗透情况
+- **理论上限暴露度 (score_ceiling)**: 评估5-10年内技术可行性的上限
 - **分数差距 (Gap)**: 揭示"技术可行"与"实际部署"之间的差距
 
 ### 中国特色分析
@@ -237,7 +237,7 @@
 
 如果您在研究或文章中使用本数据，请引用：
 ```
-中国职业 AI 暴露度分析 (2024).
+中国职业AI暴露度图谱. SAIFS, 2026.
 GitHub: https://github.com/SAIFS-AIHub/ChinaJob
 在线演示: https://saifs-aihub.github.io/ChinaJob/ChinaAIExposure.html
 数据版本: V5 (42职业)
@@ -261,6 +261,6 @@ GitHub: https://github.com/SAIFS-AIHub/ChinaJob
 
 ---
 
-**最后更新**：2024-03-18
+**最后更新**：2026-03-18
 **数据版本**：V5 (42职业)
 **联系方式**：通过 GitHub Issues 联系
